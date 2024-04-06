@@ -1,1 +1,96 @@
-参考: https://learn.microsoft.com/ja-jp/windows/win32/rpc/tutorial
+参考にしたチュートリアル: https://learn.microsoft.com/ja-jp/windows/win32/rpc/tutorial
+
+
+
+
+
+uuidgenについて、検索場所: Program Files (x86)フォルダ内にたいして「uuidgen」で検索をかけたところ、以下のようにヒットした
+
+"C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\uuidgen.exe"
+"C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\arm64\uuidgen.exe"
+"C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x86\uuidgen.exe"
+
+UUID の生成[[https://learn.microsoft.com/ja-jp/windows/win32/rpc/generating-the-uuid]]では、以下のような手順でUUID
+UUIDを生成した。
+
+1. vscode のターミナルを「powershell」から「Command Prompt」にする(参考: [[https://www.javadrive.jp/vscode/terminal/index2.html]])
+2. 「CD src」と打ち込みsrcフォルダに移動
+3. 以下のようにコマンドを打ち込む
+"C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\uuidgen.exe" /i /ohello.idl
+
+
+
+
+
+MIDLコンパイラについて、Program Files (x86)フォルダ内に対して「midl.exe」で検索をかけたところ、以下の結果が得られた
+
+"C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\midl.exe"
+"C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\arm64\midl.exe"
+"C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x86\midl.exe"
+
+また、以下の手順でmidlコンパイラを利用してスタブを生成した
+1. vscode のターミナルを「powershell」から「Command Prompt」にする(参考: [[https://www.javadrive.jp/vscode/terminal/index2.html]])
+2. 「CD src」と打ち込みsrcフォルダに移動
+3. 以下のコマンドを打った
+>"C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\midl.exe" hello.idl 
+
+すると以下のようにエラーが出た
+Microsoft (R) 32b/64b MIDL Compiler Version 8.01.0622 
+Copyright (c) Microsoft Corporation. All rights reserved.
+64 bit Processing .\hello.idl
+midl : command line error MIDL1005 : cannot find C preprocessor cl.exe
+
+対応としてcl.exeを探してパスを通す
+1. 「C:\Program Files (x86)」フォルダ以下を「cl.exe」検索。「cl.exe」はなかった
+2. 「C:\Program Files (x86)」フォルダ以下を「cl.exe」検索、以下が見つかる
+"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.37.32822\bin\Hostx64\x86\cl.exe"
+"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.37.32822\bin\Hostx86\x64\cl.exe"
+"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.37.32822\bin\Hostx64\x64\cl.exe"
+
+ので、Hostx64\x64\cl.exeをとりあえずパスを通してみる
+
+3. 同様のエラー、PC再帰してみる
+4. とりあえず「cl.exe」のパスは通った。以下のエラーが出た
+>"C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\midl.exe" hello.idl 
+Microsoft (R) 32b/64b MIDL Compiler Version 8.01.0622 
+Copyright (c) Microsoft Corporation. All rights reserved.
+64 bit Processing .\hello.idl
+hello.idl
+.\hello.idl(1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの 損失を防ぐために、ファイルを Unicode 形式で保存してくだ さい。
+64 bit Processing .\hello.acf
+hello.acf
+.\hello.acf(1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの 損失を防ぐために、ファイルを Unicode 形式で保存してくだ さい。
+.\hello.acf(9) : error MIDL2095 : interface name specified in the ACF file does not match that specified in the IDL file : hello
+.\hello.acf(9) : warning MIDL2214 : semantic check incomplete due to previous errors
+
+5. .acfファイルの文字コードがまずいっぽいので「hello.idl」「hello.acf」のコメント全部けしてやる
+結果は以下
+>"C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\midl.exe" hello.idl
+Microsoft (R) 32b/64b MIDL Compiler Version 8.01.0622 
+Copyright (c) Microsoft Corporation. All rights reserved.
+64 bit Processing .\hello.idl
+hello.idl
+64 bit Processing .\hello.acf
+hello.acf
+.\hello.acf(5) : error MIDL2095 : interface name specified in the ACF file does not match that specified in the IDL file : hello
+.\hello.acf(5) : warning MIDL2214 : semantic check incomplete due to previous errors
+
+上記問題の原因と対応は以下の通り
+原因: uuidgenで生成したUUIDが記述されているidlのファイルのインターフェース名を初期値のままにしていた
+対応: 「hello.idl」の該当箇所を以下のように修正
+* 変更前
+interface INTERFACENAME
+
+* 変更後
+interface hello
+
+無事、スタブであるhello_c.cとhello_s.cが生成された
+
+>"C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\midl.exe" hello.idl
+Microsoft (R) 32b/64b MIDL Compiler Version 8.01.0622 
+Copyright (c) Microsoft Corporation. All rights reserved.
+64 bit Processing .\hello.idl
+hello.idl
+64 bit Processing .\hello.acf
+hello.acf
+
